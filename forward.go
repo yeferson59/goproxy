@@ -3,7 +3,10 @@ package main
 import (
 	"net"
 	"net/http"
+	"strings"
 )
+
+var hopByHopHeaders [9]string = [9]string{"Connection", "Proxy-Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailer", "Transfer-Encoding", "Upgrade"}
 
 // removeHopByHop borra de h las cabeceras de salto: primero las que nombra
 // cada valor de "Connection" (separadas por coma), después las de una lista
@@ -13,7 +16,16 @@ import (
 //
 // Tarea 4, paso 3.
 func removeHopByHop(h http.Header) {
-	panic("sin implementar: Tarea 4")
+	conns := h["Connection"]
+	for _, conn := range conns {
+		for otherConns := range strings.SplitSeq(conn, ",") {
+			h.Del(strings.TrimSpace(otherConns))
+		}
+	}
+
+	for _, headers := range hopByHopHeaders {
+		h.Del(headers)
+	}
 }
 
 // forward reenvía una petición HTTP en texto claro al destino y copia la
