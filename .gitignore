@@ -1,0 +1,5 @@
+# Configuración local de Claude Code
+.claude/settings.local.json
+
+# Binario compilado
+/goproxy
