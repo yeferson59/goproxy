@@ -2,9 +2,12 @@ package main
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"time"
 )
 
 // Serve acepta conexiones en ln y atiende cada una en su propia goroutine
@@ -15,7 +18,20 @@ import (
 //
 // Tarea 3, paso 5.
 func (p *Proxy) Serve(ln net.Listener) error {
-	panic("sin implementar: Tarea 3")
+	defer ln.Close()
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+
+			return err
+		}
+
+		go p.handleConn(conn)
+	}
 }
 
 // handleConn atiende a un cliente de principio a fin:
@@ -31,7 +47,40 @@ func (p *Proxy) Serve(ln net.Listener) error {
 //
 // Tarea 3, paso 6.
 func (p *Proxy) handleConn(client net.Conn) {
-	panic("sin implementar: Tarea 3")
+	buf := bufio.NewReader(client)
+
+	defer client.Close()
+
+	for {
+		client.SetReadDeadline(time.Now().Add(p.IdleTimeout))
+
+		req, err := readRequest(buf)
+		if err != nil {
+			var netErr net.Error
+			isTimeout := errors.As(err, &netErr) && netErr.Timeout()
+
+			if errors.Is(err, io.EOF) || isTimeout {
+				return
+			}
+
+			p.Log.Errorf("petición mal formada de %s: %v", client.RemoteAddr(), err)
+
+			writeError(client, 400, "petición mal formada")
+
+			return
+		}
+		client.SetReadDeadline(time.Time{})
+
+		if req.Method != http.MethodConnect {
+			if !p.forward(client, req) {
+				return
+			}
+		} else {
+			p.tunnel(client, buf, req)
+
+			return
+		}
+	}
 }
 
 // readRequest lee una petición HTTP de br. Es el único lugar donde se analiza
@@ -39,7 +88,7 @@ func (p *Proxy) handleConn(client net.Conn) {
 //
 // Tarea 3, paso 4.
 func readRequest(br *bufio.Reader) (*http.Request, error) {
-	panic("sin implementar: Tarea 3")
+	return http.ReadRequest(br)
 }
 
 // writeError escribe a mano una respuesta de error completa: línea de estado
@@ -49,5 +98,9 @@ func readRequest(br *bufio.Reader) (*http.Request, error) {
 //
 // Tarea 3, paso 3.
 func writeError(w io.Writer, status int, msg string) error {
-	panic("sin implementar: Tarea 3")
+	if _, err := fmt.Fprintf(w, "HTTP/1.1 %d %s\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", status, http.StatusText(status), len(msg), msg); err != nil {
+		return err
+	}
+
+	return nil
 }
