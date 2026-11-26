@@ -50,7 +50,8 @@ go build -o goproxy . && ./goproxy -v
 > [!WARNING]
 > The proxy has no authentication. It listens on `127.0.0.1` by default so
 > it can't be used as an open proxy by anyone on your network. Think twice
-> before binding it to `0.0.0.0`.
+> before binding it to `0.0.0.0`. Authentication and a client allowlist are
+> planned in [Phase 1 of the roadmap](ROADMAP.md#phase-1-safe-to-expose).
 
 **Using it from a browser:** set the HTTP and HTTPS proxy to
 `127.0.0.1:8080`. On Windows that's *Settings → Network & internet → Proxy →
@@ -313,22 +314,27 @@ server for `CONNECT`), so they don't need internet access. They cover:
 Reading HTTP requests goes through a single function (`readRequest`), so it
 can later be replaced by a hand-written parser without touching the rest.
 
-## Scope
+## Scope and roadmap
 
-Not supported, on purpose:
+Not supported yet, with the roadmap phase that plans it:
 
-- **Inspecting HTTPS content.** Tunnels are opaque. Reading HTTPS would need
-  a local certificate authority and per-domain certificates (MITM). That's
-  the planned second stage.
-- Proxy authentication, SOCKS5, caching, HTTP/2 or HTTP/3, filtering, and
-  reusing connections to target servers.
-- Production hardening or a configuration file.
+- **Inspecting HTTPS content.** Tunnels are opaque. Reading HTTPS needs a
+  local certificate authority and per-host certificates (MITM). *Phase 4.*
+- Proxy authentication, a client allowlist, a destination policy for
+  `CONNECT`, and limits on header size, upstream response time and concurrent
+  connections. *Phase 1.*
+- A configuration file, configurable timeouts, structured logs and graceful
+  shutdown. *Phase 2.*
+- Reusing connections to target servers, the `Via` header and WebSocket over
+  `ws://`. *Phase 3.*
+- SOCKS5, caching, filtering, chaining to another proxy and HTTP/2.
+  *Phase 5.*
 
-## Design documents
+Out of scope: production-grade performance, HTTP/3, reverse proxy features,
+and running as an open proxy.
 
-These are in Spanish:
-
-- [Design spec](docs/specs/2026-11-23-forward-proxy-design.md): goals,
-  non-goals, approaches considered and the decisions taken.
-- [Implementation plan](docs/plans/2026-11-23-forward-proxy.md): the
-  step-by-step tasks, each with its tests, that produced this code.
+[ROADMAP.md](ROADMAP.md) has the planned order, the gaps found in the
+current code, and the principles every change keeps: standard library only,
+nothing inside the proxy that hides the mechanism (`http.Server`,
+`http.Transport`, `http.Client`, `httputil`), and listening on `127.0.0.1`
+by default.
