@@ -81,7 +81,7 @@ update the README.
 
 ## Phase 0: Housekeeping
 
-- [ ] Remove the `Tarea N, paso M` lines. Rewrite the doc comments of `Serve`,
+- [x] Remove the `Tarea N, paso M` lines. Rewrite the doc comments of `Serve`,
   `handleConn`, `readRequest`, `writeError`, `removeHopByHop`, `forward` and
   `tunnel` so they say what each function does and why, not the steps to
   write it.

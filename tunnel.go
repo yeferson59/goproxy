@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+// closeWrite closes only the write half of c, when the connection supports
+// it (TCP does). The other side gets EOF but can keep sending in the other
+// direction, so a response still on its way isn't cut off.
 func closeWrite(c net.Conn) {
 	v, ok := c.(interface{ CloseWrite() error })
 	if !ok {
@@ -20,14 +23,17 @@ func closeWrite(c net.Conn) {
 	v.CloseWrite()
 }
 
-// tunnel atiende un CONNECT: conecta con req.Host ("host:puerto"; sin puerto
-// → 400), responde "HTTP/1.1 200 Connection Established\r\n\r\n" y copia
-// bytes en las dos direcciones hasta que ambos lados terminan. La subida
-// copia desde br, no desde client, para no perder bytes que ya estaban en el
-// búfer. Cada copia, al terminar, cierra solo la mitad de escritura del otro
-// lado (CloseWrite). handleConn cierra client al volver.
+// tunnel serves a CONNECT: it dials req.Host ("host:port"; without a port
+// the client gets 400), replies "200 Connection Established" and copies raw
+// bytes in both directions until both sides are done. It never looks at the
+// bytes, so the TLS session runs end to end between the client and the
+// target.
 //
-// Tarea 6, paso 3.
+// The upstream copy reads from br, not from client: br may already hold the
+// start of the TLS handshake, sent together with the CONNECT line. When a
+// copy finishes, it closes only the write half of the other side. Tunnels
+// have no idle timeout, because a browser tab can keep one open for a long
+// time. handleConn closes client when tunnel returns.
 func (p *Proxy) tunnel(client net.Conn, br *bufio.Reader, req *http.Request) {
 	target := req.Host
 	host, port, err := net.SplitHostPort(req.Host)
@@ -63,7 +69,11 @@ func (p *Proxy) tunnel(client net.Conn, br *bufio.Reader, req *http.Request) {
 	}
 	defer up.Close()
 
-	client.Write(fmt.Appendf([]byte{}, "HTTP/1.1 %d Connection Established\r\n\r\n", http.StatusOK))
+	if _, err := client.Write(fmt.Appendf([]byte{}, "HTTP/1.1 %d Connection Established\r\n\r\n", http.StatusOK)); err != nil {
+		p.Log.HTTPError(req.Method, target, http.StatusInternalServerError, err)
+
+		return
+	}
 
 	p.Log.TunnelOpen(target)
 

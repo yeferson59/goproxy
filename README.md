@@ -63,8 +63,7 @@ you're done.
 ## Reading the log
 
 The proxy prints one line per event: the time, the method, the target, and
-then the result. Code comments and log messages are in Spanish. This is what
-they mean:
+then the result. Log messages are in Spanish. This is what they mean:
 
 | Log text                                                    | Meaning                                                        |
 |-------------------------------------------------------------|----------------------------------------------------------------|

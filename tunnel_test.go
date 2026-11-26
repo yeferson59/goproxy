@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-// --- Utilidades para probar el túnel ---
+// --- Tunnel helpers ---
 
-// echoServer devuelve cada byte que recibe y cierra cuando el otro lado
-// termina de mandar.
+// echoServer sends back every byte it receives and closes when the other
+// side finishes sending.
 func echoServer(t *testing.T) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -37,9 +37,9 @@ func echoServer(t *testing.T) string {
 	return ln.Addr().String()
 }
 
-// connect abre un túnel por el proxy hacia target. extra viaja en la misma
-// escritura que el CONNECT, como hacen los clientes que mandan el saludo TLS
-// sin esperar el 200.
+// connect opens a tunnel through the proxy to target. extra travels in the
+// same write as the CONNECT, as clients do when they send the TLS handshake
+// without waiting for the 200.
 func connect(t *testing.T, proxyAddr, target, extra string) (net.Conn, *bufio.Reader) {
 	t.Helper()
 	conn, br := rawConn(t, proxyAddr)
@@ -56,7 +56,7 @@ func connect(t *testing.T, proxyAddr, target, extra string) (net.Conn, *bufio.Re
 	return conn, br
 }
 
-// readN lee exactamente n bytes del túnel.
+// readN reads exactly n bytes from the tunnel.
 func readN(t *testing.T, br *bufio.Reader, n int) string {
 	t.Helper()
 	buf := make([]byte, n)
@@ -66,7 +66,7 @@ func readN(t *testing.T, br *bufio.Reader, n int) string {
 	return string(buf)
 }
 
-// --- Túnel ---
+// --- Tunnel ---
 
 func TestTunnelHTTPS(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +74,7 @@ func TestTunnelHTTPS(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	addr, logs := startProxy(t, nil)
-	// El Transport de srv.Client() confía en el certificado de prueba.
+	// The Transport from srv.Client() trusts the test certificate.
 	client := proxyClient(t, addr, srv.Client().Transport.(*http.Transport))
 
 	resp, err := client.Get(srv.URL)
@@ -89,16 +89,16 @@ func TestTunnelHTTPS(t *testing.T) {
 	}
 	waitForLog(t, logs, "túnel abierto")
 
-	// Cerrar la conexión del cliente tiene que terminar el túnel.
+	// Closing the client connection has to end the tunnel.
 	client.CloseIdleConnections()
 	waitForLog(t, logs, "cerrado")
 }
 
 func TestTunnelKeepsBufferedBytes(t *testing.T) {
 	addr, _ := startProxy(t, nil)
-	// "PING" llega pegado al CONNECT, así que el bufio.Reader de handleConn
-	// ya lo leyó del socket. Si el túnel copia desde la conexión cruda en vez
-	// de desde ese bufio.Reader, "PING" se pierde.
+	// "PING" arrives together with the CONNECT, so handleConn's bufio.Reader
+	// has already read it from the socket. If the tunnel copied from the raw
+	// connection instead of that bufio.Reader, "PING" would be lost.
 	conn, br := connect(t, addr, echoServer(t), "PING")
 	conn.SetDeadline(time.Now().Add(time.Second))
 
@@ -116,9 +116,8 @@ func TestTunnelEchoBothWays(t *testing.T) {
 		t.Errorf("el eco devolvió %q, quiero %q", got, "hola")
 	}
 
-	// Cerramos solo nuestra mitad de escritura. El proxy tiene que pasarle
-	// ese EOF al destino; el eco entonces cierra, y ese cierre tiene que
-	// volver hasta nosotros.
+	// We close only our write half. The proxy has to pass that EOF on to the
+	// target; the echo then closes, and that close has to travel back to us.
 	conn.(*net.TCPConn).CloseWrite()
 	conn.SetDeadline(time.Now().Add(2 * time.Second))
 	expectClosed(t, br)
@@ -128,8 +127,8 @@ func TestTunnelEchoBothWays(t *testing.T) {
 func TestTunnelMissingPort400(t *testing.T) {
 	for _, target := range []string{"nohost", "nohost:"} {
 		t.Run(target, func(t *testing.T) {
-			// Si el proxy intentara conectarse, este Dial fallaría y la
-			// respuesta sería 502 en vez de 400.
+			// If the proxy tried to connect, this Dial would fail and the
+			// response would be 502 instead of 400.
 			addr, logs := startProxy(t, func(p *Proxy) {
 				p.Dial = func(string) (net.Conn, error) { return nil, errors.New("no debería conectarse a ningún lado") }
 			})
@@ -160,8 +159,8 @@ func TestTunnelUnreachable502(t *testing.T) {
 	waitForLog(t, logs, " 502  ")
 }
 
-// Un túnel puede pasar mucho tiempo sin tráfico (una pestaña abierta): el
-// plazo de inactividad entre peticiones HTTP no se le aplica.
+// A tunnel can go a long time without traffic (an open tab): the idle
+// timeout between HTTP requests doesn't apply to it.
 func TestTunnelOutlivesIdleTimeout(t *testing.T) {
 	addr, _ := startProxy(t, func(p *Proxy) { p.IdleTimeout = 200 * time.Millisecond })
 	conn, br := connect(t, addr, echoServer(t), "")
@@ -173,10 +172,11 @@ func TestTunnelOutlivesIdleTimeout(t *testing.T) {
 	}
 }
 
-// --- Review Focus ---
+// --- Edge cases ---
 
 func TestTunnelServerClosesFirst(t *testing.T) {
-	// Un destino que saluda y cierra enseguida, sin esperar nada del cliente.
+	// A target that greets and closes right away, without waiting for the
+	// client.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -196,13 +196,13 @@ func TestTunnelServerClosesFirst(t *testing.T) {
 	if got := readN(t, br, 5); got != "adios" {
 		t.Errorf("llegó %q, quiero %q", got, "adios")
 	}
-	// El cierre del destino tiene que llegarnos como EOF aunque nosotros
-	// sigamos con la conexión abierta.
+	// The target's close has to reach us as EOF even though we keep our side
+	// of the connection open.
 	conn.SetDeadline(time.Now().Add(2 * time.Second))
 	expectClosed(t, br)
 
-	// Recién cuando cerramos nosotros termina la otra copia y el túnel se
-	// registra como cerrado.
+	// Only when we close does the other copy finish and the tunnel get
+	// logged as closed.
 	conn.Close()
 	waitForLog(t, logs, "cerrado  0B↑ 5B↓")
 }

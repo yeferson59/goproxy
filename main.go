@@ -1,6 +1,6 @@
-// goproxy es un proxy de salida (forward proxy) HTTP escrito para aprender
-// cómo funciona un proxy por dentro: acepta conexiones TCP, reenvía peticiones
-// HTTP en texto claro y abre túneles CONNECT para HTTPS.
+// goproxy is a forward HTTP proxy written to learn how a proxy works on the
+// inside: it accepts TCP connections, forwards plain HTTP requests and opens
+// CONNECT tunnels for HTTPS.
 package main
 
 import (
@@ -17,8 +17,8 @@ func main() {
 	verbose := flag.Bool("v", false, "muestra las cabeceras de cada petición y respuesta")
 	flag.Parse()
 
-	// Por defecto solo 127.0.0.1: escuchar en todas las interfaces dejaría un
-	// proxy abierto a cualquiera en la red.
+	// Only 127.0.0.1 by default: listening on every interface would leave an
+	// open proxy for anyone on the network.
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "no se pudo escuchar:", err)
@@ -28,9 +28,9 @@ func main() {
 	p := NewProxy(NewLogger(os.Stdout))
 	p.Verbose = *verbose
 
-	// Cerrar el listener hace que Accept falle con net.ErrClosed, y Serve lo
-	// interpreta como un apagado normal. No se espera a las conexiones que
-	// siguen abiertas: el proceso termina y el sistema las cierra.
+	// Closing the listener makes Accept fail with net.ErrClosed, which Serve
+	// treats as a normal shutdown. Connections that are still open aren't
+	// waited for: the process exits and the OS closes them.
 	go func() {
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)

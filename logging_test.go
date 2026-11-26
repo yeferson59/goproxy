@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// newTestLogger fija la hora para que las líneas sean comparables.
+// newTestLogger fixes the time so lines can be compared.
 func newTestLogger() (*Logger, *bytes.Buffer) {
 	var buf bytes.Buffer
 	l := NewLogger(&buf)

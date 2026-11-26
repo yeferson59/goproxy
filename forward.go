@@ -9,15 +9,15 @@ import (
 	"time"
 )
 
+// hopByHopHeaders lists the headers that describe a single connection
+// (client ↔ proxy, or proxy ↔ target) rather than the message, so a proxy
+// must not pass them on (RFC 9110 §7.6.1).
 var hopByHopHeaders = [9]string{"Connection", "Proxy-Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailer", "Transfer-Encoding", "Upgrade"}
 
-// removeHopByHop borra de h las cabeceras de salto: primero las que nombra
-// cada valor de "Connection" (separadas por coma), después las de una lista
-// fija (hopByHopHeaders: Connection, Proxy-Connection, Keep-Alive,
-// Proxy-Authenticate, Proxy-Authorization, Te, Trailer, Transfer-Encoding,
-// Upgrade).
-//
-// Tarea 4, paso 3.
+// removeHopByHop deletes the hop-by-hop headers from h: first every header
+// named in the Connection values (comma-separated), then the fixed list in
+// hopByHopHeaders. The order matters: Connection is in that list, and
+// deleting it first would lose the names it carries.
 func removeHopByHop(h http.Header) {
 	conns := h["Connection"]
 	for _, conn := range conns {
@@ -31,16 +31,15 @@ func removeHopByHop(h http.Header) {
 	}
 }
 
-// forward reenvía una petición HTTP en texto claro al destino y copia la
-// respuesta al cliente. Devuelve si la conexión con el cliente puede seguir
-// para la siguiente petición (keep-alive).
+// forward sends a plain HTTP request to its target and copies the response
+// back to the client. It returns whether the client connection can stay open
+// for the next request (keep-alive).
 //
-// Resumen: validar URL absoluta http:// (si no, 400), calcular host:puerto,
-// quitar cabeceras de salto, req.Close = true, conectar (502/504 si falla),
-// req.Write, leer la respuesta saltando las 1xx, quitar cabeceras de salto,
-// decidir keep-alive, resp.Write al cliente y registrar.
-//
-// Tarea 5, paso 3.
+// Every request gets a new connection to the target, which is asked to close
+// it afterwards. That's the simplest flow to follow, at the cost of a TCP
+// handshake per request. Errors are answered by the proxy itself: 400 for a
+// URL that isn't absolute http://, 502 or 504 when the target can't be
+// reached, and 502 when it doesn't send a valid response.
 func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 	start := time.Now()
 	target := req.URL.String()
@@ -71,6 +70,9 @@ func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 		p.Log.Headers("petición al destino", req.Header)
 	}
 
+	// One connection per request: Connection: close tells the target to close
+	// it once the response is done. Whether the client connection stays open
+	// is decided separately, with clientClose.
 	req.Close = true
 
 	up, err := p.dial(addr)
@@ -85,11 +87,10 @@ func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 	}
 	defer up.Close()
 
-	// Write manda la petición en forma de origen ("GET /ruta HTTP/1.1"), que
-	// es como se le habla a un servidor. WriteProxy la mandaría en forma
-	// absoluta ("GET http://host/ruta HTTP/1.1"), que es como el cliente le
-	// habló al proxy. Pasar de una forma a la otra es parte del trabajo del
-	// proxy.
+	// Write sends the request in origin form ("GET /path HTTP/1.1"), which is
+	// how you talk to a server. WriteProxy would send it in absolute form
+	// ("GET http://host/path HTTP/1.1"), which is how the client talked to the
+	// proxy. Going from one form to the other is part of the proxy's job.
 	if err := req.Write(up); err != nil {
 		writeError(client, http.StatusBadGateway, err.Error())
 
@@ -100,6 +101,10 @@ func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 
 	upBr := bufio.NewReader(up)
 
+	// Passing req lets ReadResponse know that a response to HEAD has no body.
+	// Interim 1xx responses are skipped: with Expect: 100-continue the target
+	// first sends 100 Continue and then the real response. 101 isn't interim:
+	// it switches the connection to another protocol.
 	resp, err := http.ReadResponse(upBr, req)
 	for err == nil && resp.StatusCode >= 100 && resp.StatusCode <= 199 && resp.StatusCode != 101 {
 		resp, err = http.ReadResponse(upBr, req)
@@ -124,17 +129,18 @@ func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 		p.Log.Headers("respuesta al cliente", resp.Header)
 	}
 
-	// TransferEncoding viene vacío en casi todas las respuestas: hay que
-	// mirar el largo antes de pedir el elemento 0.
+	// TransferEncoding is empty in most responses: check its length before
+	// reading element 0.
 	chunked := len(resp.TransferEncoding) > 0 && resp.TransferEncoding[0] == "chunked"
 
-	// Se puede seguir si el cliente no pidió cerrar y sabe dónde termina el
-	// cuerpo (por su largo, o porque chunked marca su propio final). Sin
-	// eso, el final del cuerpo solo se puede marcar cerrando la conexión.
+	// The connection can stay open if the client didn't ask to close it and
+	// can tell where the body ends (by its length, or because chunked marks
+	// its own end). Otherwise, only closing the connection can mark the end of
+	// the body.
 	keepAlive = !clientClose && (resp.ContentLength >= 0 || chunked)
 
-	// El Connection: close del destino habla de su conexión con el proxy, no
-	// de la del cliente: se pisa con lo que decidimos arriba.
+	// The target's Connection: close is about its connection with the proxy,
+	// not the client's: it's overridden with the decision above.
 	resp.Close = !keepAlive
 
 	if err := resp.Write(client); err != nil {

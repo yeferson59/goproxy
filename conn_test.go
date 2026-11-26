@@ -64,13 +64,13 @@ func TestServeReturnsWhenListenerCloses(t *testing.T) {
 func TestServeHandlesClientsConcurrently(t *testing.T) {
 	addr, _ := startProxy(t, nil)
 
-	// El primer cliente se conecta y no manda nada: su goroutine se queda
-	// esperando una petición.
+	// The first client connects and sends nothing: its goroutine stays
+	// waiting for a request.
 	rawConn(t, addr)
 
-	// El segundo tiene que recibir respuesta de todos modos. Si Serve
-	// aceptara una sola conexión, o atendiera a los clientes en fila (sin
-	// go), este nunca la recibiría.
+	// The second one has to get a response anyway. If Serve accepted only
+	// one connection, or served clients one at a time (without go), it would
+	// never get one.
 	conn, br := rawConn(t, addr)
 	conn.SetDeadline(time.Now().Add(time.Second))
 	io.WriteString(conn, "esto no es http\r\n\r\n")
@@ -118,8 +118,8 @@ func TestClientHangUpIsQuiet(t *testing.T) {
 	conn.Close()
 	time.Sleep(200 * time.Millisecond)
 
-	// Cerrar sin mandar nada es lo que hace un navegador con las conexiones
-	// que abrió de más: no es un error.
+	// Closing without sending anything is what a browser does with the
+	// spare connections it opened: it's not an error.
 	if strings.Contains(logs.String(), "ERROR") {
 		t.Errorf("cerrar sin mandar nada no debería registrar un error; log:\n%s", logs.String())
 	}
