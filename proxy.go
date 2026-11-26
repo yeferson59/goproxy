@@ -18,7 +18,7 @@ type Proxy struct {
 	// IdleTimeout cierra la conexión con un cliente que no manda una nueva
 	// petición en ese tiempo.
 	IdleTimeout time.Duration
-	// Dial reemplaza la conexión al destino. Si es nil se usa TCP real; las
+	// Dial reemplaza la conexión al destino. Si es nil se usa TCP real, las
 	// pruebas lo cambian para simular fallos que son difíciles de provocar,
 	// como un tiempo agotado.
 	Dial func(addr string) (net.Conn, error)

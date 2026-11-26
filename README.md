@@ -168,6 +168,28 @@ goproxy: dozens of tunnels to GitHub, MSN, Bing and Microsoft services. For exam
 
 ![More browser traffic, including closed tunnels with byte counts](evidences/work_web.png)
 
+**An iPhone on the same Wi-Fi.** The proxy ran under WSL2 with
+`-addr 0.0.0.0:8080`, and the iPhone's Wi-Fi proxy (*Settings → Wi-Fi → (i)
+→ Configure Proxy → Manual*) pointed at the PC's address on the local
+network, `192.168.40.5`, port `8080`.
+
+![iPhone "Configure Proxy" screen set to Manual, server 192.168.40.5, port 8080](evidences/config_proxy_iphone.jpeg)
+
+Reaching WSL2 from another device took three temporary changes on Windows,
+all undone after the test. WSL2's default NAT networking forwards only
+Windows' `localhost` to WSL, so a `netsh interface portproxy` rule forwarded
+port 8080 on the Wi-Fi address to WSL. A Windows Firewall rule allowed the
+port from the local subnet only. McAfee's firewall still blocked it, so it
+was off during the test.
+
+**Traffic from the phone.** The phone's requests arrive as `CONNECT` tunnels
+to Apple hosts, mostly the App Store's (`*.itunes.apple.com`,
+`amp-api.apps.apple.com`, `is1-ssl.mzstatic.com`), plus `ocsp2.apple.com`
+for certificate checks. For example, `downloaddispatch.itunes.apple.com:443`
+closed after 859 ms with 8 KB up and 38 KB down.
+
+![CONNECT tunnels from the iPhone to App Store and Apple hosts](evidences/traffic_from_iphone.png)
+
 **Verbose mode and a 502.** The proxy runs with `-v` while Windows' network
 connectivity check (`User-Agent: Microsoft NCSI`) sends a plain HTTP request
 through it. The dump shows the headers received from the client and the
