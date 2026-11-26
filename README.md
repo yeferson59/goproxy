@@ -254,6 +254,23 @@ the request sent to the target:
 were otherwise identical, because the parsed response had no hop-by-hop
 headers left to remove.)
 
+### On a server
+
+goproxy also ran on an Ubuntu 24.04 server as a systemd service,
+`goproxy.service`, so it starts at boot and keeps running in the background
+with no terminal open. Its output goes to the systemd journal, and
+`journalctl -u goproxy.service -f` follows it live. `systemctl stop` sends
+`SIGTERM`, which goproxy handles the same way as `Ctrl+C`.
+
+Each journal line has two timestamps: journald's, followed by the host name
+and `goproxy[41981]` (the process ID), and then goproxy's own. The tunnels go
+to Microsoft services (`msn.com`, `bing.com`, `office.com`), iCloud,
+WhatsApp's CDN, Cloudflare and OpenAI. For example,
+`browser.events.data.msn.com:443` closed after 125.8 s with 225 KB up and
+11 KB down. Lines longer than the terminal wrap onto the next line.
+
+![journalctl following goproxy.service: CONNECT tunnels to MSN, iCloud, WhatsApp, Cloudflare and OpenAI](evidences/goproxy_background_server_live.png)
+
 ### Automated tests
 
 ```sh
