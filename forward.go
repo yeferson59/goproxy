@@ -44,7 +44,7 @@ func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 	start := time.Now()
 	target := req.URL.String()
 	if req.URL.Scheme != "http" || req.URL.Host == "" {
-		msg := "se esperaba una URL absoluta http://"
+		msg := "expected an absolute http:// URL"
 
 		writeError(client, http.StatusBadRequest, msg)
 
@@ -61,13 +61,13 @@ func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 	addr, clientClose := net.JoinHostPort(host, port), req.Close
 
 	if p.Verbose {
-		p.Log.Headers("petición del cliente", req.Header)
+		p.Log.Headers("request from client", req.Header)
 	}
 
 	removeHopByHop(req.Header)
 
 	if p.Verbose {
-		p.Log.Headers("petición al destino", req.Header)
+		p.Log.Headers("request to target", req.Header)
 	}
 
 	// One connection per request: Connection: close tells the target to close
@@ -120,13 +120,13 @@ func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 	defer resp.Body.Close()
 
 	if p.Verbose {
-		p.Log.Headers("respuesta del destino", resp.Header)
+		p.Log.Headers("response from target", resp.Header)
 	}
 
 	removeHopByHop(resp.Header)
 
 	if p.Verbose {
-		p.Log.Headers("respuesta al cliente", resp.Header)
+		p.Log.Headers("response to client", resp.Header)
 	}
 
 	// TransferEncoding is empty in most responses: check its length before
@@ -144,7 +144,7 @@ func (p *Proxy) forward(client net.Conn, req *http.Request) (keepAlive bool) {
 	resp.Close = !keepAlive
 
 	if err := resp.Write(client); err != nil {
-		p.Log.Errorf("escribiendo la respuesta a %s: %v", client.RemoteAddr(), err)
+		p.Log.Errorf("writing response to %s: %v", client.RemoteAddr(), err)
 
 		return false
 	}

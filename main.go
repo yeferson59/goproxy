@@ -13,15 +13,15 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:8080", "dirección donde escucha el proxy")
-	verbose := flag.Bool("v", false, "muestra las cabeceras de cada petición y respuesta")
+	addr := flag.String("addr", "127.0.0.1:8080", "address the proxy listens on")
+	verbose := flag.Bool("v", false, "print the headers of every request and response")
 	flag.Parse()
 
 	// Only 127.0.0.1 by default: listening on every interface would leave an
 	// open proxy for anyone on the network.
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "no se pudo escuchar:", err)
+		fmt.Fprintln(os.Stderr, "cannot listen:", err)
 		os.Exit(1)
 	}
 
@@ -38,7 +38,7 @@ func main() {
 		ln.Close()
 	}()
 
-	fmt.Println("goproxy escuchando en", ln.Addr())
+	fmt.Println("goproxy listening on", ln.Addr())
 	if err := p.Serve(ln); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)

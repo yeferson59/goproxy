@@ -65,9 +65,9 @@ func (p *Proxy) handleConn(client net.Conn) {
 				return
 			}
 
-			p.Log.Errorf("petición mal formada de %s: %v", client.RemoteAddr(), err)
+			p.Log.Errorf("malformed request from %s: %v", client.RemoteAddr(), err)
 
-			writeError(client, http.StatusBadRequest, "petición mal formada")
+			writeError(client, http.StatusBadRequest, "malformed request")
 
 			return
 		}

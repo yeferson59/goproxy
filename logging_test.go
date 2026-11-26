@@ -19,7 +19,7 @@ func newTestLogger() (*Logger, *bytes.Buffer) {
 func TestFormatBytes(t *testing.T) {
 	for n, want := range map[int64]string{0: "0B", 512: "512B", 49152: "48KB", 1258291: "1.2MB"} {
 		if got := formatBytes(n); got != want {
-			t.Errorf("formatBytes(%d) = %q, quiero %q", n, got, want)
+			t.Errorf("formatBytes(%d) = %q, want %q", n, got, want)
 		}
 	}
 }
@@ -33,7 +33,7 @@ func TestFormatDuration(t *testing.T) {
 	}
 	for d, want := range cases {
 		if got := formatDuration(d); got != want {
-			t.Errorf("formatDuration(%v) = %q, quiero %q", d, got, want)
+			t.Errorf("formatDuration(%v) = %q, want %q", d, got, want)
 		}
 	}
 }
@@ -47,24 +47,24 @@ func TestLoggerLines(t *testing.T) {
 		{"http", func(l *Logger) { l.HTTP("GET", "http://example.com/", 200, 12*time.Millisecond) },
 			"14:02:11 GET     http://example.com/       200  12ms\n"},
 		{"http error", func(l *Logger) {
-			l.HTTPError("GET", "http://nohay.invalid/", 502, errors.New("dial: no such host"))
+			l.HTTPError("GET", "http://nothere.invalid/", 502, errors.New("dial: no such host"))
 		},
-			"14:02:11 GET     http://nohay.invalid/     502  dial: no such host\n"},
+			"14:02:11 GET     http://nothere.invalid/   502  dial: no such host\n"},
 		{"tunnel open", func(l *Logger) { l.TunnelOpen("www.google.com:443") },
-			"14:02:11 CONNECT www.google.com:443        túnel abierto\n"},
+			"14:02:11 CONNECT www.google.com:443        tunnel open\n"},
 		{"tunnel closed", func(l *Logger) {
 			l.TunnelClosed("www.google.com:443", 49152, 1258291, 3100*time.Millisecond)
 		},
-			"14:02:11 CONNECT www.google.com:443        cerrado  48KB↑ 1.2MB↓  3.1s\n"},
-		{"error", func(l *Logger) { l.Errorf("petición mal formada de %s", "127.0.0.1:5000") },
-			"14:02:11 ERROR   petición mal formada de 127.0.0.1:5000\n"},
+			"14:02:11 CONNECT www.google.com:443        closed  48KB↑ 1.2MB↓  3.1s\n"},
+		{"error", func(l *Logger) { l.Errorf("malformed request from %s", "127.0.0.1:5000") },
+			"14:02:11 ERROR   malformed request from 127.0.0.1:5000\n"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			l, buf := newTestLogger()
 			c.log(l)
 			if got := buf.String(); got != c.want {
-				t.Errorf("\nobtuve %q\nquiero %q", got, c.want)
+				t.Errorf("\ngot  %q\nwant %q", got, c.want)
 			}
 		})
 	}
@@ -72,17 +72,17 @@ func TestLoggerLines(t *testing.T) {
 
 func TestLoggerHeaders(t *testing.T) {
 	l, buf := newTestLogger()
-	l.Headers("petición del cliente", http.Header{
+	l.Headers("request from client", http.Header{
 		"User-Agent": {"curl/8.0"},
 		"Accept":     {"*/*"},
 		"X-Multi":    {"a", "b"},
 	})
-	want := "    --- petición del cliente ---\n" +
+	want := "    --- request from client ---\n" +
 		"    Accept: */*\n" +
 		"    User-Agent: curl/8.0\n" +
 		"    X-Multi: a\n" +
 		"    X-Multi: b\n"
 	if got := buf.String(); got != want {
-		t.Errorf("\nobtuve %q\nquiero %q", got, want)
+		t.Errorf("\ngot  %q\nwant %q", got, want)
 	}
 }

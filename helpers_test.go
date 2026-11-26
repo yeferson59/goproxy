@@ -113,7 +113,7 @@ func waitForLog(t *testing.T, logs *syncBuffer, substr string) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("el log no contiene %q; log completo:\n%s", substr, logs.String())
+	t.Fatalf("log doesn't contain %q; full log:\n%s", substr, logs.String())
 }
 
 // readBody reads and closes a complete body.
@@ -122,7 +122,7 @@ func readBody(t *testing.T, r io.ReadCloser) string {
 	defer r.Close()
 	b, err := io.ReadAll(r)
 	if err != nil {
-		t.Fatalf("leyendo el cuerpo: %v", err)
+		t.Fatalf("reading body: %v", err)
 	}
 	return string(b)
 }
@@ -133,6 +133,6 @@ func expectClosed(t *testing.T, br *bufio.Reader) {
 	t.Helper()
 	b, err := br.ReadByte()
 	if !errors.Is(err, io.EOF) {
-		t.Fatalf("esperaba EOF (conexión cerrada), obtuve byte %q, error %v", b, err)
+		t.Fatalf("want EOF (connection closed), got byte %q, error %v", b, err)
 	}
 }

@@ -29,7 +29,7 @@ func TestRemoveHopByHop(t *testing.T) {
 	removeHopByHop(h)
 
 	if len(h) != 1 || h.Get("X-Normal") != "ok" {
-		t.Errorf("solo debería quedar X-Normal; quedó %v", h)
+		t.Errorf("only X-Normal should remain; got %v", h)
 	}
 }
 
@@ -47,7 +47,7 @@ func TestRemoveHopByHopMultipleConnectionHeaders(t *testing.T) {
 	removeHopByHop(h)
 
 	if len(h) != 1 || h.Get("X-Normal") != "ok" {
-		t.Errorf("solo debería quedar X-Normal; quedó %v", h)
+		t.Errorf("only X-Normal should remain; got %v", h)
 	}
 }
 
@@ -71,7 +71,7 @@ func newOrigin(t *testing.T) *origin {
 		o.header = r.Header.Clone()
 		o.mu.Unlock()
 
-		w.Header().Set("X-Upstream", "si")
+		w.Header().Set("X-Upstream", "yes")
 		// Keep-Alive is hop-by-hop: the proxy shouldn't pass it on to the client.
 		w.Header().Set("Keep-Alive", "timeout=5")
 		switch r.URL.Path {
@@ -84,11 +84,11 @@ func newOrigin(t *testing.T) *origin {
 		case "/chunked":
 			// Flush sends the first part before the total length is known, so
 			// Go responds with Transfer-Encoding: chunked.
-			io.WriteString(w, "parte1")
+			io.WriteString(w, "part1")
 			w.(http.Flusher).Flush()
-			io.WriteString(w, "parte2")
+			io.WriteString(w, "part2")
 		default:
-			io.WriteString(w, "hola")
+			io.WriteString(w, "home")
 		}
 	}))
 	t.Cleanup(o.Close)
@@ -129,7 +129,7 @@ func noLengthOrigin(t *testing.T) string {
 						break
 					}
 				}
-				io.WriteString(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\ncuerpo sin longitud")
+				io.WriteString(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nbody without length")
 			}()
 		}
 	}()
@@ -142,7 +142,7 @@ func readResponse(t *testing.T, br *bufio.Reader, method string) *http.Response 
 	t.Helper()
 	resp, err := http.ReadResponse(br, &http.Request{Method: method})
 	if err != nil {
-		t.Fatalf("leyendo la respuesta del proxy: %v", err)
+		t.Fatalf("reading proxy response: %v", err)
 	}
 	return resp
 }
@@ -158,26 +158,26 @@ func TestForwardGET(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != 200 {
-		t.Errorf("StatusCode = %d, quiero 200", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
 	}
-	if body := readBody(t, resp.Body); body != "hola" {
-		t.Errorf("cuerpo = %q, quiero %q", body, "hola")
+	if body := readBody(t, resp.Body); body != "home" {
+		t.Errorf("body = %q, want %q", body, "home")
 	}
-	if got := resp.Header.Get("X-Upstream"); got != "si" {
-		t.Errorf("X-Upstream = %q: el proxy perdió una cabecera normal del destino", got)
+	if got := resp.Header.Get("X-Upstream"); got != "yes" {
+		t.Errorf("X-Upstream = %q: the proxy dropped a regular header from the target", got)
 	}
 	if got := resp.Header.Get("Keep-Alive"); got != "" {
-		t.Errorf("Keep-Alive = %q: es de salto y no debería llegar al cliente", got)
+		t.Errorf("Keep-Alive = %q: it's hop-by-hop and shouldn't reach the client", got)
 	}
 
 	// Origin form: the target sees only the path, never "http://...".
 	if uri, _ := o.last(); uri != "/?x=1" {
-		t.Errorf("el destino recibió la ruta %q, quiero %q", uri, "/?x=1")
+		t.Errorf("target got path %q, want %q", uri, "/?x=1")
 	}
 
 	waitForLog(t, logs, o.URL+"/?x=1")
 	if !strings.Contains(logs.String(), " 200  ") {
-		t.Errorf("el log no muestra el código 200:\n%s", logs.String())
+		t.Errorf("log doesn't show status 200:\n%s", logs.String())
 	}
 }
 
@@ -191,10 +191,10 @@ func TestForwardPOSTLargeBody(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != 200 {
-		t.Errorf("StatusCode = %d, quiero 200", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
 	}
 	if got := readBody(t, resp.Body); got != string(body) {
-		t.Errorf("el eco tiene %d bytes, quiero %d iguales a los enviados", len(got), len(body))
+		t.Errorf("echo has %d bytes, want the %d bytes sent", len(got), len(body))
 	}
 }
 
@@ -206,17 +206,17 @@ func TestForwardChunked(t *testing.T) {
 	io.WriteString(conn, "GET "+o.URL+"/chunked HTTP/1.1\r\nHost: x\r\n\r\n")
 	resp := readResponse(t, br, "GET")
 	if len(resp.TransferEncoding) == 0 || resp.TransferEncoding[0] != "chunked" {
-		t.Errorf("TransferEncoding = %v, quiero [chunked]", resp.TransferEncoding)
+		t.Errorf("TransferEncoding = %v, want [chunked]", resp.TransferEncoding)
 	}
-	if body := readBody(t, resp.Body); body != "parte1parte2" {
-		t.Errorf("cuerpo = %q, quiero %q", body, "parte1parte2")
+	if body := readBody(t, resp.Body); body != "part1part2" {
+		t.Errorf("body = %q, want %q", body, "part1part2")
 	}
 
 	// A chunked body marks its own end, so the connection can stay open.
 	io.WriteString(conn, "GET "+o.URL+"/ HTTP/1.1\r\nHost: x\r\n\r\n")
 	resp = readResponse(t, br, "GET")
-	if body := readBody(t, resp.Body); body != "hola" {
-		t.Errorf("segunda petición: cuerpo = %q, quiero %q", body, "hola")
+	if body := readBody(t, resp.Body); body != "home" {
+		t.Errorf("second request: body = %q, want %q", body, "home")
 	}
 }
 
@@ -229,13 +229,13 @@ func TestForwardKeepAlive(t *testing.T) {
 		io.WriteString(conn, "GET "+o.URL+"/ HTTP/1.1\r\nHost: x\r\n\r\n")
 		resp := readResponse(t, br, "GET")
 		if resp.StatusCode != 200 {
-			t.Errorf("petición %d: StatusCode = %d, quiero 200", i, resp.StatusCode)
+			t.Errorf("request %d: StatusCode = %d, want 200", i, resp.StatusCode)
 		}
-		if body := readBody(t, resp.Body); body != "hola" {
-			t.Errorf("petición %d: cuerpo = %q, quiero %q", i, body, "hola")
+		if body := readBody(t, resp.Body); body != "home" {
+			t.Errorf("request %d: body = %q, want %q", i, body, "home")
 		}
 		if resp.Close {
-			t.Errorf("petición %d: el proxy anunció Connection: close, pero el cliente no lo pidió", i)
+			t.Errorf("request %d: proxy sent Connection: close, but the client didn't ask for it", i)
 		}
 	}
 }
@@ -259,15 +259,15 @@ func TestForwardStripsHopByHopUpstream(t *testing.T) {
 	_, h := o.last()
 	for _, k := range []string{"X-Secret", "Proxy-Connection", "Keep-Alive", "Proxy-Authorization"} {
 		if v := h.Get(k); v != "" {
-			t.Errorf("el destino recibió %s: %q; es de salto", k, v)
+			t.Errorf("target got %s: %q; it's hop-by-hop", k, v)
 		}
 	}
 	if got := h.Get("X-Normal"); got != "ok" {
-		t.Errorf("X-Normal = %q: el proxy perdió una cabecera normal", got)
+		t.Errorf("X-Normal = %q: the proxy dropped a regular header", got)
 	}
 	// The proxy uses a new connection per request and tells the target so.
 	if got := h.Get("Connection"); got != "close" {
-		t.Errorf("Connection hacia el destino = %q, quiero %q", got, "close")
+		t.Errorf("Connection to target = %q, want %q", got, "close")
 	}
 }
 
@@ -280,7 +280,7 @@ func TestForwardUnreachable502(t *testing.T) {
 	}
 	readBody(t, resp.Body)
 	if resp.StatusCode != 502 {
-		t.Errorf("StatusCode = %d, quiero 502", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 502", resp.StatusCode)
 	}
 	waitForLog(t, logs, " 502  ")
 }
@@ -299,7 +299,7 @@ func TestForwardDialTimeout504(t *testing.T) {
 	}
 	readBody(t, resp.Body)
 	if resp.StatusCode != 504 {
-		t.Errorf("StatusCode = %d, quiero 504", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 504", resp.StatusCode)
 	}
 	waitForLog(t, logs, " 504  ")
 }
@@ -314,7 +314,7 @@ func TestForwardRejectsNonAbsolute400(t *testing.T) {
 	resp := readResponse(t, br, "GET")
 	readBody(t, resp.Body)
 	if resp.StatusCode != 400 {
-		t.Errorf("StatusCode = %d, quiero 400", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 400", resp.StatusCode)
 	}
 	expectClosed(t, br)
 }
@@ -323,7 +323,7 @@ func TestForwardRejectsNonHTTPScheme400(t *testing.T) {
 	// If the proxy tried to connect, this Dial would fail and the response
 	// would be 502 instead of 400.
 	addr, _ := startProxy(t, func(p *Proxy) {
-		p.Dial = func(string) (net.Conn, error) { return nil, errors.New("no debería conectarse a ningún lado") }
+		p.Dial = func(string) (net.Conn, error) { return nil, errors.New("should not dial anywhere") }
 	})
 	conn, br := rawConn(t, addr)
 
@@ -333,7 +333,7 @@ func TestForwardRejectsNonHTTPScheme400(t *testing.T) {
 	resp := readResponse(t, br, "GET")
 	readBody(t, resp.Body)
 	if resp.StatusCode != 400 {
-		t.Errorf("StatusCode = %d, quiero 400", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 400", resp.StatusCode)
 	}
 	expectClosed(t, br)
 }
@@ -348,17 +348,17 @@ func TestForwardVerboseLogsHeaders(t *testing.T) {
 	readBody(t, resp.Body)
 
 	for _, s := range []string{
-		"--- petición del cliente ---",
-		"--- petición al destino ---",
-		"--- respuesta del destino ---",
-		"--- respuesta al cliente ---",
+		"--- request from client ---",
+		"--- request to target ---",
+		"--- response from target ---",
+		"--- response to client ---",
 		" 200  ",
 	} {
 		waitForLog(t, logs, s)
 	}
 	// It appears in what the client sent and in none of the later dumps.
 	if n := strings.Count(logs.String(), "Proxy-Connection: keep-alive"); n != 1 {
-		t.Errorf("Proxy-Connection aparece %d veces, quiero 1 (solo en la petición del cliente); log:\n%s", n, logs.String())
+		t.Errorf("Proxy-Connection appears %d times, want 1 (only in the client's request); log:\n%s", n, logs.String())
 	}
 }
 
@@ -371,19 +371,19 @@ func TestForwardBodyWithoutLength(t *testing.T) {
 	io.WriteString(conn, "GET http://"+noLengthOrigin(t)+"/ HTTP/1.1\r\nHost: x\r\n\r\n")
 	resp := readResponse(t, br, "GET")
 	if resp.StatusCode != 200 {
-		t.Errorf("StatusCode = %d, quiero 200", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
 	}
 	// The body ends when the proxy closes. It has to close because it knows
 	// it must, not because the idle timeout ran out (5 s in tests): if it
 	// takes longer than 1 s, readBody fails.
 	conn.SetDeadline(time.Now().Add(time.Second))
-	if body := readBody(t, resp.Body); body != "cuerpo sin longitud" {
-		t.Errorf("cuerpo = %q, quiero %q", body, "cuerpo sin longitud")
+	if body := readBody(t, resp.Body); body != "body without length" {
+		t.Errorf("body = %q, want %q", body, "body without length")
 	}
 	// Without a length, the client only knows the body ended because the
 	// connection closes: the proxy has to signal it and close.
 	if !resp.Close {
-		t.Errorf("falta Connection: close en una respuesta sin longitud")
+		t.Errorf("missing Connection: close on a response without length")
 	}
 	expectClosed(t, br)
 }
@@ -397,10 +397,10 @@ func TestForwardSkips100Continue(t *testing.T) {
 	io.WriteString(conn, "POST "+o.URL+"/echo HTTP/1.1\r\nHost: x\r\nExpect: 100-continue\r\nContent-Length: 5\r\n\r\nhello")
 	resp := readResponse(t, br, "POST")
 	if resp.StatusCode != 200 {
-		t.Fatalf("la primera respuesta es %d, quiero 200 (el 100 Continue del destino no debería llegar al cliente)", resp.StatusCode)
+		t.Fatalf("first response is %d, want 200 (the target's 100 Continue shouldn't reach the client)", resp.StatusCode)
 	}
 	if body := readBody(t, resp.Body); body != "hello" {
-		t.Errorf("cuerpo = %q, quiero %q", body, "hello")
+		t.Errorf("body = %q, want %q", body, "hello")
 	}
 }
 
@@ -412,21 +412,21 @@ func TestForwardHEADKeepsConnection(t *testing.T) {
 	io.WriteString(conn, "HEAD "+o.URL+"/ HTTP/1.1\r\nHost: x\r\n\r\n")
 	resp := readResponse(t, br, "HEAD")
 	if resp.StatusCode != 200 {
-		t.Errorf("HEAD: StatusCode = %d, quiero 200", resp.StatusCode)
+		t.Errorf("HEAD: StatusCode = %d, want 200", resp.StatusCode)
 	}
 	if resp.ContentLength != 4 {
-		t.Errorf("HEAD: ContentLength = %d, quiero 4 (el largo que tendría el GET)", resp.ContentLength)
+		t.Errorf("HEAD: ContentLength = %d, want 4 (the length a GET would have)", resp.ContentLength)
 	}
 	if body := readBody(t, resp.Body); body != "" {
-		t.Errorf("HEAD: cuerpo = %q, quiero vacío", body)
+		t.Errorf("HEAD: body = %q, want empty", body)
 	}
 
 	// If the proxy waited for the 4 body bytes of a HEAD, it would hang and
 	// this second request would never get a response.
 	io.WriteString(conn, "GET "+o.URL+"/ HTTP/1.1\r\nHost: x\r\n\r\n")
 	resp = readResponse(t, br, "GET")
-	if body := readBody(t, resp.Body); body != "hola" {
-		t.Errorf("GET después de HEAD: cuerpo = %q, quiero %q", body, "hola")
+	if body := readBody(t, resp.Body); body != "home" {
+		t.Errorf("GET after HEAD: body = %q, want %q", body, "home")
 	}
 }
 
@@ -437,11 +437,11 @@ func TestForwardClientConnectionClose(t *testing.T) {
 
 	io.WriteString(conn, "GET "+o.URL+"/ HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
 	resp := readResponse(t, br, "GET")
-	if body := readBody(t, resp.Body); body != "hola" {
-		t.Errorf("cuerpo = %q, quiero %q", body, "hola")
+	if body := readBody(t, resp.Body); body != "home" {
+		t.Errorf("body = %q, want %q", body, "home")
 	}
 	if !resp.Close {
-		t.Errorf("el cliente pidió Connection: close y la respuesta no lo confirma")
+		t.Errorf("client asked for Connection: close and the response doesn't confirm it")
 	}
 	// It has to close right away, not when the idle timeout runs out (5 s
 	// in tests, 60 s for real).
@@ -462,9 +462,9 @@ func TestForwardSlowBodyOutlivesIdleTimeout(t *testing.T) {
 
 	resp := readResponse(t, br, "POST")
 	if resp.StatusCode != 200 {
-		t.Errorf("StatusCode = %d, quiero 200", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
 	}
 	if body := readBody(t, resp.Body); body != "helloworld" {
-		t.Errorf("cuerpo = %q, quiero %q", body, "helloworld")
+		t.Errorf("body = %q, want %q", body, "helloworld")
 	}
 }

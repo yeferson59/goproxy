@@ -47,10 +47,10 @@ func connect(t *testing.T, proxyAddr, target, extra string) (net.Conn, *bufio.Re
 	for _, want := range []string{"HTTP/1.1 200 Connection Established\r\n", "\r\n"} {
 		line, err := br.ReadString('\n')
 		if err != nil {
-			t.Fatalf("leyendo la respuesta al CONNECT: %v", err)
+			t.Fatalf("reading CONNECT response: %v", err)
 		}
 		if line != want {
-			t.Fatalf("respuesta al CONNECT: %q, quiero %q", line, want)
+			t.Fatalf("CONNECT response: %q, want %q", line, want)
 		}
 	}
 	return conn, br
@@ -61,7 +61,7 @@ func readN(t *testing.T, br *bufio.Reader, n int) string {
 	t.Helper()
 	buf := make([]byte, n)
 	if _, err := io.ReadFull(br, buf); err != nil {
-		t.Fatalf("leyendo %d bytes del túnel: %v (llegó %q)", n, err, buf)
+		t.Fatalf("reading %d bytes from tunnel: %v (got %q)", n, err, buf)
 	}
 	return string(buf)
 }
@@ -70,7 +70,7 @@ func readN(t *testing.T, br *bufio.Reader, n int) string {
 
 func TestTunnelHTTPS(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "hola por https")
+		io.WriteString(w, "hello over https")
 	}))
 	t.Cleanup(srv.Close)
 	addr, logs := startProxy(t, nil)
@@ -82,16 +82,16 @@ func TestTunnelHTTPS(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != 200 {
-		t.Errorf("StatusCode = %d, quiero 200", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
 	}
-	if body := readBody(t, resp.Body); body != "hola por https" {
-		t.Errorf("cuerpo = %q, quiero %q", body, "hola por https")
+	if body := readBody(t, resp.Body); body != "hello over https" {
+		t.Errorf("body = %q, want %q", body, "hello over https")
 	}
-	waitForLog(t, logs, "túnel abierto")
+	waitForLog(t, logs, "tunnel open")
 
 	// Closing the client connection has to end the tunnel.
 	client.CloseIdleConnections()
-	waitForLog(t, logs, "cerrado")
+	waitForLog(t, logs, "closed")
 }
 
 func TestTunnelKeepsBufferedBytes(t *testing.T) {
@@ -103,7 +103,7 @@ func TestTunnelKeepsBufferedBytes(t *testing.T) {
 	conn.SetDeadline(time.Now().Add(time.Second))
 
 	if got := readN(t, br, 4); got != "PING" {
-		t.Errorf("el eco devolvió %q, quiero %q", got, "PING")
+		t.Errorf("echo returned %q, want %q", got, "PING")
 	}
 }
 
@@ -111,9 +111,9 @@ func TestTunnelEchoBothWays(t *testing.T) {
 	addr, logs := startProxy(t, nil)
 	conn, br := connect(t, addr, echoServer(t), "")
 
-	io.WriteString(conn, "hola")
-	if got := readN(t, br, 4); got != "hola" {
-		t.Errorf("el eco devolvió %q, quiero %q", got, "hola")
+	io.WriteString(conn, "ping")
+	if got := readN(t, br, 4); got != "ping" {
+		t.Errorf("echo returned %q, want %q", got, "ping")
 	}
 
 	// We close only our write half. The proxy has to pass that EOF on to the
@@ -130,7 +130,7 @@ func TestTunnelMissingPort400(t *testing.T) {
 			// If the proxy tried to connect, this Dial would fail and the
 			// response would be 502 instead of 400.
 			addr, logs := startProxy(t, func(p *Proxy) {
-				p.Dial = func(string) (net.Conn, error) { return nil, errors.New("no debería conectarse a ningún lado") }
+				p.Dial = func(string) (net.Conn, error) { return nil, errors.New("should not dial anywhere") }
 			})
 			conn, br := rawConn(t, addr)
 
@@ -138,7 +138,7 @@ func TestTunnelMissingPort400(t *testing.T) {
 			resp := readResponse(t, br, "CONNECT")
 			readBody(t, resp.Body)
 			if resp.StatusCode != 400 {
-				t.Errorf("StatusCode = %d, quiero 400", resp.StatusCode)
+				t.Errorf("StatusCode = %d, want 400", resp.StatusCode)
 			}
 			waitForLog(t, logs, " 400  ")
 		})
@@ -154,7 +154,7 @@ func TestTunnelUnreachable502(t *testing.T) {
 	resp := readResponse(t, br, "CONNECT")
 	readBody(t, resp.Body)
 	if resp.StatusCode != 502 {
-		t.Errorf("StatusCode = %d, quiero 502", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 502", resp.StatusCode)
 	}
 	waitForLog(t, logs, " 502  ")
 }
@@ -166,9 +166,9 @@ func TestTunnelOutlivesIdleTimeout(t *testing.T) {
 	conn, br := connect(t, addr, echoServer(t), "")
 
 	time.Sleep(500 * time.Millisecond)
-	io.WriteString(conn, "sigo aquí")
-	if got := readN(t, br, len("sigo aquí")); got != "sigo aquí" {
-		t.Errorf("el eco devolvió %q, quiero %q", got, "sigo aquí")
+	io.WriteString(conn, "still here")
+	if got := readN(t, br, len("still here")); got != "still here" {
+		t.Errorf("echo returned %q, want %q", got, "still here")
 	}
 }
 
@@ -187,14 +187,14 @@ func TestTunnelServerClosesFirst(t *testing.T) {
 		if err != nil {
 			return
 		}
-		io.WriteString(conn, "adios")
+		io.WriteString(conn, "hello")
 		conn.Close()
 	}()
 	addr, logs := startProxy(t, nil)
 	conn, br := connect(t, addr, ln.Addr().String(), "")
 
-	if got := readN(t, br, 5); got != "adios" {
-		t.Errorf("llegó %q, quiero %q", got, "adios")
+	if got := readN(t, br, 5); got != "hello" {
+		t.Errorf("got %q, want %q", got, "hello")
 	}
 	// The target's close has to reach us as EOF even though we keep our side
 	// of the connection open.
@@ -204,5 +204,5 @@ func TestTunnelServerClosesFirst(t *testing.T) {
 	// Only when we close does the other copy finish and the tunnel get
 	// logged as closed.
 	conn.Close()
-	waitForLog(t, logs, "cerrado  0B↑ 5B↓")
+	waitForLog(t, logs, "closed  0B↑ 5B↓")
 }

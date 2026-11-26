@@ -13,31 +13,31 @@ import (
 
 func TestWriteError(t *testing.T) {
 	var buf bytes.Buffer
-	if err := writeError(&buf, 502, "no se pudo conectar"); err != nil {
+	if err := writeError(&buf, 502, "could not connect"); err != nil {
 		t.Fatalf("writeError: %v", err)
 	}
 	if !strings.HasPrefix(buf.String(), "HTTP/1.1 502 Bad Gateway\r\n") {
-		t.Fatalf("línea de estado: %q", buf.String())
+		t.Fatalf("status line: %q", buf.String())
 	}
 	raw := buf.String()
 	resp, err := http.ReadResponse(bufio.NewReader(&buf), nil)
 	if err != nil {
-		t.Fatalf("http.ReadResponse no entiende la respuesta: %v\nen crudo: %q", err, raw)
+		t.Fatalf("http.ReadResponse can't parse the response: %v\nraw: %q", err, raw)
 	}
 	if resp.StatusCode != 502 {
-		t.Errorf("StatusCode = %d, quiero 502", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 502", resp.StatusCode)
 	}
 	if !resp.Close {
-		t.Errorf("falta Connection: close")
+		t.Errorf("missing Connection: close")
 	}
 	if got := resp.Header.Get("Content-Type"); got != "text/plain; charset=utf-8" {
 		t.Errorf("Content-Type = %q", got)
 	}
-	if resp.ContentLength != int64(len("no se pudo conectar")) {
-		t.Errorf("ContentLength = %d, quiero %d", resp.ContentLength, len("no se pudo conectar"))
+	if resp.ContentLength != int64(len("could not connect")) {
+		t.Errorf("ContentLength = %d, want %d", resp.ContentLength, len("could not connect"))
 	}
-	if body := readBody(t, resp.Body); body != "no se pudo conectar" {
-		t.Errorf("cuerpo = %q", body)
+	if body := readBody(t, resp.Body); body != "could not connect" {
+		t.Errorf("body = %q", body)
 	}
 }
 
@@ -54,10 +54,10 @@ func TestServeReturnsWhenListenerCloses(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf("Serve devolvió %v, quiero nil al cerrar el listener", err)
+			t.Fatalf("Serve returned %v, want nil after the listener closed", err)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("Serve no volvió después de cerrar el listener")
+		t.Fatal("Serve didn't return after the listener closed")
 	}
 }
 
@@ -73,28 +73,28 @@ func TestServeHandlesClientsConcurrently(t *testing.T) {
 	// never get one.
 	conn, br := rawConn(t, addr)
 	conn.SetDeadline(time.Now().Add(time.Second))
-	io.WriteString(conn, "esto no es http\r\n\r\n")
+	io.WriteString(conn, "this is not http\r\n\r\n")
 	resp, err := http.ReadResponse(br, nil)
 	if err != nil {
-		t.Fatalf("el segundo cliente no recibió respuesta mientras el primero seguía conectado: %v", err)
+		t.Fatalf("second client got no response while the first was still connected: %v", err)
 	}
 	readBody(t, resp.Body)
 	if resp.StatusCode != 400 {
-		t.Errorf("StatusCode = %d, quiero 400", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 400", resp.StatusCode)
 	}
 }
 
 func TestMalformedRequestGets400(t *testing.T) {
 	addr, logs := startProxy(t, nil)
 	conn, br := rawConn(t, addr)
-	io.WriteString(conn, "esto no es http\r\n\r\n")
+	io.WriteString(conn, "this is not http\r\n\r\n")
 
 	resp, err := http.ReadResponse(br, nil)
 	if err != nil {
-		t.Fatalf("leyendo la respuesta: %v", err)
+		t.Fatalf("reading response: %v", err)
 	}
 	if resp.StatusCode != 400 {
-		t.Errorf("StatusCode = %d, quiero 400", resp.StatusCode)
+		t.Errorf("StatusCode = %d, want 400", resp.StatusCode)
 	}
 	readBody(t, resp.Body)
 	expectClosed(t, br)
@@ -108,7 +108,7 @@ func TestIdleClientIsClosed(t *testing.T) {
 	start := time.Now()
 	expectClosed(t, br)
 	if elapsed := time.Since(start); elapsed > 2*time.Second {
-		t.Errorf("el proxy tardó %v en cerrar un cliente inactivo; IdleTimeout era 200ms", elapsed)
+		t.Errorf("proxy took %v to close an idle client; IdleTimeout was 200ms", elapsed)
 	}
 }
 
@@ -121,6 +121,6 @@ func TestClientHangUpIsQuiet(t *testing.T) {
 	// Closing without sending anything is what a browser does with the
 	// spare connections it opened: it's not an error.
 	if strings.Contains(logs.String(), "ERROR") {
-		t.Errorf("cerrar sin mandar nada no debería registrar un error; log:\n%s", logs.String())
+		t.Errorf("closing without sending anything shouldn't log an error; log:\n%s", logs.String())
 	}
 }

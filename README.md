@@ -1,5 +1,7 @@
 # goproxy
 
+[![CI](https://github.com/yeferson59/goproxy/actions/workflows/ci.yml/badge.svg)](https://github.com/yeferson59/goproxy/actions/workflows/ci.yml)
+
 A forward HTTP proxy written from scratch in Go using only the standard
 library. It forwards plain HTTP requests, tunnels HTTPS through `CONNECT`, and
 logs each request and tunnel to the terminal while you browse.
@@ -22,7 +24,7 @@ go run .
 ```
 
 ```
-goproxy escuchando en 127.0.0.1:8080
+goproxy listening on 127.0.0.1:8080
 ```
 
 In a second terminal, send traffic through it:
@@ -42,9 +44,9 @@ go run . [-addr host:port] [-v]
 go build -o goproxy . && ./goproxy -v
 ```
 
-| Flag    | Default          | Description                                                                 |
-|---------|------------------|-----------------------------------------------------------------------------|
-| `-addr` | `127.0.0.1:8080` | Address the proxy listens on.                                               |
+| Flag    | Default          | Description                                                                                                 |
+| ------- | ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| `-addr` | `127.0.0.1:8080` | Address the proxy listens on.                                                                               |
 | `-v`    | off              | Print the full headers of every HTTP request and response, before and after hop-by-hop headers are removed. |
 
 > [!WARNING]
@@ -54,8 +56,8 @@ go build -o goproxy . && ./goproxy -v
 > planned in [Phase 1 of the roadmap](ROADMAP.md#phase-1-safe-to-expose).
 
 **Using it from a browser:** set the HTTP and HTTPS proxy to
-`127.0.0.1:8080`. On Windows that's *Settings → Network & internet → Proxy →
-Manual proxy setup* (see the [screenshot](evidences/proxy_config_windows.png));
+`127.0.0.1:8080`. On Windows that's _Settings → Network & internet → Proxy →
+Manual proxy setup_ (see the [screenshot](evidences/proxy_config_windows.png));
 Firefox has its own network settings. When running under WSL2, a Windows
 browser can usually reach WSL's `localhost`. Remove the proxy setting when
 you're done.
@@ -63,25 +65,25 @@ you're done.
 ## Reading the log
 
 The proxy prints one line per event: the time, the method, the target, and
-then the result. Log messages are in Spanish. This is what they mean:
+then the result.
 
-| Log text                                                    | Meaning                                                        |
-|-------------------------------------------------------------|----------------------------------------------------------------|
-| `goproxy escuchando en …`                                   | goproxy listening on …                                         |
-| `GET http://example.com/  200  141ms`                       | Forwarded request: status code and total time                  |
-| `CONNECT example.com:443  túnel abierto`                    | Tunnel opened                                                  |
-| `CONNECT example.com:443  cerrado  1KB↑ 6KB↓  196ms`        | Tunnel closed: bytes client → target (↑), target → client (↓), duration |
-| `GET http://nohay.invalid/  502  dial tcp: …`               | The proxy answered with an error itself (400, 502 or 504) and the reason |
-| `ERROR …`                                                   | An error not tied to one request, such as a malformed request  |
+| Log text                                            | Meaning                                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------ |
+| `goproxy listening on …`                            | The proxy started and is listening on that address                       |
+| `GET http://example.com/  200  141ms`               | Forwarded request: status code and total time                            |
+| `CONNECT example.com:443  tunnel open`              | Tunnel opened                                                            |
+| `CONNECT example.com:443  closed  1KB↑ 6KB↓  196ms` | Tunnel closed: bytes client → target (↑), target → client (↓), duration  |
+| `GET http://nothere.invalid/  502  dial tcp: …`     | The proxy answered with an error itself (400, 502 or 504) and the reason |
+| `ERROR …`                                           | An error not tied to one request, such as a malformed request            |
 
 With `-v`, each forwarded request also prints four header blocks:
 
-| Block                       | Meaning                                    |
-|-----------------------------|--------------------------------------------|
-| `--- petición del cliente ---`  | Request as received from the client    |
-| `--- petición al destino ---`   | Request as sent to the target server   |
-| `--- respuesta del destino ---` | Response as received from the target   |
-| `--- respuesta al cliente ---`  | Response as sent back to the client    |
+| Block                          | Meaning                              |
+| ------------------------------ | ------------------------------------ |
+| `--- request from client ---`  | Request as received from the client  |
+| `--- request to target ---`    | Request as sent to the target server |
+| `--- response from target ---` | Response as received from the target |
+| `--- response to client ---`   | Response as sent back to the client  |
 
 ## How it works
 
@@ -102,6 +104,7 @@ client ──TCP──▶ goproxy (127.0.0.1:8080)
 seconds to send the next one before the proxy closes the connection.
 
 **Plain HTTP forwarding**
+
 - Only absolute `http://` URLs are accepted, which is how clients talk to a
   proxy. Anything else gets `400`.
 - The request is rewritten from absolute form (`GET http://host/path`) to
@@ -117,6 +120,7 @@ seconds to send the next one before the proxy closes the connection.
   body.
 
 **HTTPS tunnels (`CONNECT`)**
+
 - The proxy dials `host:port` and replies `200 Connection Established`.
   After that it copies raw bytes without looking at them, so the TLS session
   runs end to end between the client and the server.
@@ -128,11 +132,11 @@ seconds to send the next one before the proxy closes the connection.
 
 **Errors and timeouts**
 
-| Situation                                                        | Response              |
-|------------------------------------------------------------------|-----------------------|
+| Situation                                                                        | Response              |
+| -------------------------------------------------------------------------------- | --------------------- |
 | Malformed request, non-absolute URL, non-`http` scheme, `CONNECT` without a port | `400 Bad Request`     |
-| Target unreachable (DNS failure, connection refused, no route)   | `502 Bad Gateway`     |
-| Dialing the target took longer than 10 seconds                   | `504 Gateway Timeout` |
+| Target unreachable (DNS failure, connection refused, no route)                   | `502 Bad Gateway`     |
+| Dialing the target took longer than 10 seconds                                   | `504 Gateway Timeout` |
 
 After any error response the proxy closes the client connection. Tunnels have
 no idle limit, because a browser tab can keep one open for a long time.
@@ -155,8 +159,8 @@ bytes sent each way and the duration.
 ![curl output for google.com.co and example.com through the proxy](evidences/test_proxy_curl.png)
 
 **Windows proxy settings.** To send the browser's traffic through goproxy,
-the Windows system proxy (*Settings → Network & internet → Proxy → Manual
-proxy setup*) points at `localhost` on port `8080`, with no exceptions.
+the Windows system proxy (_Settings → Network & internet → Proxy → Manual
+proxy setup_) points at `localhost` on port `8080`, with no exceptions.
 
 ![Windows "Edit proxy server" dialog set to localhost, port 8080](evidences/proxy_config_windows.png)
 
@@ -169,8 +173,8 @@ goproxy: dozens of tunnels to GitHub, MSN, Bing and Microsoft services. For exam
 ![More browser traffic, including closed tunnels with byte counts](evidences/work_web.png)
 
 **An iPhone on the same Wi-Fi.** The proxy ran under WSL2 with
-`-addr 0.0.0.0:8080`, and the iPhone's Wi-Fi proxy (*Settings → Wi-Fi → (i)
-→ Configure Proxy → Manual*) pointed at the PC's address on the local
+`-addr 0.0.0.0:8080`, and the iPhone's Wi-Fi proxy (_Settings → Wi-Fi → (i)
+→ Configure Proxy → Manual_) pointed at the PC's address on the local
 network, `192.168.40.5`, port `8080`.
 
 ![iPhone "Configure Proxy" screen set to Manual, server 192.168.40.5, port 8080](evidences/config_proxy_iphone.jpeg)
@@ -279,6 +283,9 @@ go vet ./...          # no output
 gofmt -l .            # no output
 ```
 
+[GitHub Actions](.github/workflows/ci.yml) runs the same three checks on
+every push to `main` and on every pull request.
+
 The tests run against local servers only (`httptest`, including a TLS
 server for `CONNECT`), so they don't need internet access. They cover:
 
@@ -300,15 +307,15 @@ server for `CONNECT`), so they don't need internet access. They cover:
 
 ## Project layout
 
-| File          | Responsibility                                                          |
-|---------------|-------------------------------------------------------------------------|
-| `main.go`     | Flags, listener, `Ctrl+C` / `SIGTERM` shutdown                          |
-| `proxy.go`    | `Proxy` type, timeouts, dialing the target, mapping dial errors to 502/504 |
-| `conn.go`     | Accept loop, per-connection request loop, reading requests, error responses |
-| `forward.go`  | Hop-by-hop header removal and plain HTTP forwarding                     |
-| `tunnel.go`   | `CONNECT` tunnel and bidirectional copy                                 |
-| `logging.go`  | Log line format                                                         |
-| `*_test.go`   | Tests for each file, plus shared helpers in `helpers_test.go`           |
+| File         | Responsibility                                                              |
+| ------------ | --------------------------------------------------------------------------- |
+| `main.go`    | Flags, listener, `Ctrl+C` / `SIGTERM` shutdown                              |
+| `proxy.go`   | `Proxy` type, timeouts, dialing the target, mapping dial errors to 502/504  |
+| `conn.go`    | Accept loop, per-connection request loop, reading requests, error responses |
+| `forward.go` | Hop-by-hop header removal and plain HTTP forwarding                         |
+| `tunnel.go`  | `CONNECT` tunnel and bidirectional copy                                     |
+| `logging.go` | Log line format                                                             |
+| `*_test.go`  | Tests for each file, plus shared helpers in `helpers_test.go`               |
 
 Reading HTTP requests goes through a single function (`readRequest`), so it
 can later be replaced by a hand-written parser without touching the rest.
@@ -318,16 +325,16 @@ can later be replaced by a hand-written parser without touching the rest.
 Not supported yet, with the roadmap phase that plans it:
 
 - **Inspecting HTTPS content.** Tunnels are opaque. Reading HTTPS needs a
-  local certificate authority and per-host certificates (MITM). *Phase 4.*
+  local certificate authority and per-host certificates (MITM). _Phase 4._
 - Proxy authentication, a client allowlist, a destination policy for
   `CONNECT`, and limits on header size, upstream response time and concurrent
-  connections. *Phase 1.*
+  connections. _Phase 1._
 - A configuration file, configurable timeouts, structured logs and graceful
-  shutdown. *Phase 2.*
+  shutdown. _Phase 2._
 - Reusing connections to target servers, the `Via` header and WebSocket over
-  `ws://`. *Phase 3.*
+  `ws://`. _Phase 3._
 - SOCKS5, caching, filtering, chaining to another proxy and HTTP/2.
-  *Phase 5.*
+  _Phase 5._
 
 Out of scope: production-grade performance, HTTP/3, reverse proxy features,
 and running as an open proxy.

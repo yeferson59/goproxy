@@ -87,11 +87,11 @@ update the README.
   write it.
 - [x] Change the README's *Design documents* section to link to this roadmap
   instead of the deleted spec and plan.
-- [ ] Use `http.Status*` constants everywhere. Handle the error from writing
+- [x] Use `http.Status*` constants everywhere. Handle the error from writing
   `200 Connection Established`: log it and end the tunnel instead of copying
   over a broken connection.
-- [ ] Add CI with GitHub Actions: `go test -race ./...`, `go vet ./...` and
-  `gofmt -l .` on every push and pull request.
+- [x] Add CI with GitHub Actions: `go test -race ./...`, `go vet ./...` and
+  `gofmt -l .` on every push to `main` and every pull request.
 
 **Done when** `grep -n Tarea *.go` prints nothing, the README has no broken
 links, and CI is green.

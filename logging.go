@@ -47,13 +47,13 @@ func (l *Logger) HTTPError(method, target string, status int, err error) {
 
 // TunnelOpen logs that a CONNECT tunnel was established.
 func (l *Logger) TunnelOpen(target string) {
-	l.line("CONNECT", target, "túnel abierto")
+	l.line("CONNECT", target, "tunnel open")
 }
 
 // TunnelClosed logs a tunnel closing: bytes sent up (client → target),
 // bytes received down (target → client) and how long it lasted.
 func (l *Logger) TunnelClosed(target string, up, down int64, elapsed time.Duration) {
-	l.line("CONNECT", target, fmt.Sprintf("cerrado  %s↑ %s↓  %s", formatBytes(up), formatBytes(down), formatDuration(elapsed)))
+	l.line("CONNECT", target, fmt.Sprintf("closed  %s↑ %s↓  %s", formatBytes(up), formatBytes(down), formatDuration(elapsed)))
 }
 
 // Headers dumps the headers under a title, one line per value. It's used
