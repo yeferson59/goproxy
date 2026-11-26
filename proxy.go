@@ -26,11 +26,11 @@ type Proxy struct {
 
 // NewProxy crea un Proxy con los tiempos del diseño.
 func NewProxy(log *Logger) *Proxy {
-	return &Proxy{
+	return new(Proxy{
 		Log:         log,
 		DialTimeout: 10 * time.Second,
 		IdleTimeout: 60 * time.Second,
-	}
+	})
 }
 
 // dial abre la conexión TCP hacia el destino addr ("host:puerto").
@@ -38,6 +38,7 @@ func (p *Proxy) dial(addr string) (net.Conn, error) {
 	if p.Dial != nil {
 		return p.Dial(addr)
 	}
+
 	return net.DialTimeout("tcp", addr, p.DialTimeout)
 }
 
@@ -49,8 +50,10 @@ func statusForDialError(err error) int {
 	// Timeout() distingue "el destino no respondió a tiempo" de "el destino
 	// dijo que no" o "el nombre no existe".
 	var netErr net.Error
+
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		return http.StatusGatewayTimeout
 	}
+
 	return http.StatusBadGateway
 }

@@ -33,7 +33,7 @@ func (p *Proxy) tunnel(client net.Conn, br *bufio.Reader, req *http.Request) {
 	if err != nil {
 		writeError(client, 400, "CONNECT necesita host:puerto")
 
-		p.Log.HTTPError(http.MethodConnect, target, 400, err)
+		p.Log.HTTPError(http.MethodConnect, target, http.StatusBadRequest, err)
 
 		return
 	}
@@ -43,7 +43,7 @@ func (p *Proxy) tunnel(client net.Conn, br *bufio.Reader, req *http.Request) {
 
 		writeError(client, 400, msg)
 
-		p.Log.HTTPError(http.MethodConnect, target, 400, errors.New(msg))
+		p.Log.HTTPError(http.MethodConnect, target, http.StatusBadRequest, errors.New(msg))
 
 		return
 	}

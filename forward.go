@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var hopByHopHeaders [9]string = [9]string{"Connection", "Proxy-Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailer", "Transfer-Encoding", "Upgrade"}
+var hopByHopHeaders = [9]string{"Connection", "Proxy-Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailer", "Transfer-Encoding", "Upgrade"}
 
 // removeHopByHop borra de h las cabeceras de salto: primero las que nombra
 // cada valor de "Connection" (separadas por coma), después las de una lista

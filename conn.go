@@ -69,6 +69,7 @@ func (p *Proxy) handleConn(client net.Conn) {
 
 			return
 		}
+
 		client.SetReadDeadline(time.Time{})
 
 		if req.Method != http.MethodConnect {

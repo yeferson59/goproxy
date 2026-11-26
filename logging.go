@@ -28,7 +28,9 @@ func NewLogger(out io.Writer) *Logger {
 // line escribe "hora MÉTODO destino resto" con columnas alineadas.
 func (l *Logger) line(method, target, rest string) {
 	l.mu.Lock()
+
 	defer l.mu.Unlock()
+
 	fmt.Fprintf(l.out, "%s %-7s %-25s %s\n", l.now().Format("15:04:05"), method, target, rest)
 }
 
@@ -51,8 +53,7 @@ func (l *Logger) TunnelOpen(target string) {
 // TunnelClosed registra el cierre de un túnel: bytes subidos (cliente →
 // destino), bytes bajados (destino → cliente) y cuánto duró.
 func (l *Logger) TunnelClosed(target string, up, down int64, elapsed time.Duration) {
-	l.line("CONNECT", target, fmt.Sprintf("cerrado  %s↑ %s↓  %s",
-		formatBytes(up), formatBytes(down), formatDuration(elapsed)))
+	l.line("CONNECT", target, fmt.Sprintf("cerrado  %s↑ %s↓  %s", formatBytes(up), formatBytes(down), formatDuration(elapsed)))
 }
 
 // Headers vuelca las cabeceras bajo un título, una línea por valor. Se usa con
@@ -64,11 +65,15 @@ func (l *Logger) Headers(title string, h http.Header) {
 	for k := range h {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
 
 	l.mu.Lock()
+
 	defer l.mu.Unlock()
+
 	fmt.Fprintf(l.out, "    --- %s ---\n", title)
+
 	for _, k := range keys {
 		for _, v := range h[k] {
 			fmt.Fprintf(l.out, "    %s: %s\n", k, v)
@@ -79,7 +84,9 @@ func (l *Logger) Headers(title string, h http.Header) {
 // Errorf registra un error que no corresponde a una petición concreta.
 func (l *Logger) Errorf(format string, args ...any) {
 	l.mu.Lock()
+
 	defer l.mu.Unlock()
+
 	fmt.Fprintf(l.out, "%s %-7s %s\n", l.now().Format("15:04:05"), "ERROR", fmt.Sprintf(format, args...))
 }
 
@@ -101,5 +108,6 @@ func formatDuration(d time.Duration) string {
 	if d < time.Second {
 		return fmt.Sprintf("%dms", d.Milliseconds())
 	}
+
 	return fmt.Sprintf("%.1fs", d.Seconds())
 }
