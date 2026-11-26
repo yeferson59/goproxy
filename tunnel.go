@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -31,7 +32,7 @@ func (p *Proxy) tunnel(client net.Conn, br *bufio.Reader, req *http.Request) {
 	target := req.Host
 	host, port, err := net.SplitHostPort(req.Host)
 	if err != nil {
-		writeError(client, 400, "CONNECT necesita host:puerto")
+		writeError(client, http.StatusBadRequest, "CONNECT necesita host:puerto")
 
 		p.Log.HTTPError(http.MethodConnect, target, http.StatusBadRequest, err)
 
@@ -41,7 +42,7 @@ func (p *Proxy) tunnel(client net.Conn, br *bufio.Reader, req *http.Request) {
 	if port == "" {
 		msg := "falta el puerto"
 
-		writeError(client, 400, msg)
+		writeError(client, http.StatusBadRequest, msg)
 
 		p.Log.HTTPError(http.MethodConnect, target, http.StatusBadRequest, errors.New(msg))
 
@@ -62,7 +63,7 @@ func (p *Proxy) tunnel(client net.Conn, br *bufio.Reader, req *http.Request) {
 	}
 	defer up.Close()
 
-	client.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+	client.Write(fmt.Appendf([]byte{}, "HTTP/1.1 %d Connection Established\r\n\r\n", http.StatusOK))
 
 	p.Log.TunnelOpen(target)
 
